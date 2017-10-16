@@ -19,6 +19,8 @@ screen = pygame.display.set_mode(size)
 cloud = pygame.image.load("cloud.png")
 cloud = pygame.transform.scale(cloud, (210, 150))
 
+mode = 'snow'
+
 led_radius = 2
 led_panel = (160, 100)
 led_spacing = (20, 25)
@@ -27,22 +29,67 @@ panels = [{
     'x': 100,
     'y': 450,
     'height': 4,
+    'stars': [
+        (3, 1),
+        (1, 4),
+        (4, 6),
+        (2, 10),
+        (7, 10),
+    ],
 }, {
     'x': 550,
     'y': 200,
     'height': 3,
+    'stars': [
+        (7, 0),
+        (5, 1),
+        (4, 3),
+        (3, 6),
+        (0, 7),
+        (4, 10),
+        (1, 11),
+    ],
 }, {
     'x': 450,
     'y': 680,
     'height': 2,
+    'stars': [
+        (0, 0),
+        (7, 3),
+        (3, 5),
+        (4, 2),
+        (0, 4),
+    ],
 }, {
     'x': 1200,
     'y': 250,
     'height': 6,
+    'stars': [
+        (1, 0),
+        (5, 0),
+        (6, 6),
+        (3, 7),
+        (1, 11),
+        (0, 15),
+        (3, 20),
+    ],
 }, {
     'x': 880,
     'y': 540,
     'height': 3,
+    'stars': [
+        (4, 0),
+        (5, 2),
+        (1, 1),
+        (6, 3),
+        (7, 7),
+        (1, 4),
+        (4, 9),
+        (1, 8),
+        (3, 6),
+        (7, 10),
+        (1, 11),
+    ],
 }]
 
 
@@ -59,8 +106,6 @@ print(sum(len(panel['leds']) for panel in panels))
 
 clock = pygame.time.Clock()
 
-prob = 0.3
-
 
 def anim_map(an):
     x = an[0] + an[2]
@@ -74,6 +119,11 @@ while 1:
             sys.exit()
         elif event.type == pygame.MOUSEBUTTONDOWN:
             print(pygame.mouse.get_pos())
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_a:
+            if mode == 'snow':
+                mode = 'stars'
+            else:
+                mode = 'snow'
 
     screen.fill(black)
     pygame.draw.rect(screen, blue, pygame.Rect(0, 0, 1500, 900))
@@ -100,16 +150,22 @@ while 1:
             ])
             panel['next'] = random.gammavariate(3, 10)
 
-        cloudrect = cloud.get_rect()
-        cloudrect = cloudrect.move([panel['x'] - 30, panel['y'] - 150])
-        screen.blit(cloud, cloudrect)
-
         for led in panel['leds']:
             pygame.draw.circle(screen, gray, led, led_radius)
 
-        for an in panel['animation']:
-            index = int(round(an[0]) + panel['ledsw'] * int(an[1]))
-            pygame.draw.circle(screen, white, panel['leds'][index], led_radius)
+        if mode == 'snow':
+            cloudrect = cloud.get_rect()
+            cloudrect = cloudrect.move([panel['x'] - 30, panel['y'] - 150])
+            screen.blit(cloud, cloudrect)
+
+            for an in panel['animation']:
+                index = int(round(an[0]) + panel['ledsw'] * int(an[1]))
+                pygame.draw.circle(screen, white, panel['leds'][index], led_radius)
+        else:
+            for panel in panels:
+                for star in panel['stars']:
+                    index = star[0] + panel['ledsw'] * star[1]
+                    pygame.draw.circle(screen, white, panel['leds'][index], led_radius)
 
     pygame.display.flip()
 
