@@ -17,18 +17,18 @@ blue = 0, 20, 50
 screen = pygame.display.set_mode(size)
 
 cloud = pygame.image.load("cloud.png")
-cloud = pygame.transform.scale(cloud, (210, 150))
+cloud = pygame.transform.scale(cloud, (300, 150))
 
 mode = 'snow'
 
 led_radius = 2
-led_panel = (160, 100)
+led_panel = (240, 200)
 led_spacing = (20, 25)
 
 panels = [{
     'x': 100,
     'y': 450,
-    'height': 4,
+    'height': 2,
     'stars': [
         (3, 1),
         (1, 4),
@@ -39,7 +39,7 @@ panels = [{
 }, {
     'x': 550,
     'y': 200,
-    'height': 3,
+    'height': 2,
     'stars': [
         (7, 0),
         (5, 1),
@@ -52,7 +52,7 @@ panels = [{
 }, {
     'x': 450,
     'y': 680,
-    'height': 2,
+    'height': 1,
     'stars': [
         (0, 0),
         (7, 3),
@@ -63,7 +63,7 @@ panels = [{
 }, {
     'x': 1200,
     'y': 250,
-    'height': 6,
+    'height': 3,
     'stars': [
         (1, 0),
         (5, 0),
@@ -76,7 +76,7 @@ panels = [{
 }, {
     'x': 880,
     'y': 540,
-    'height': 3,
+    'height': 2,
     'stars': [
         (4, 0),
         (5, 2),
@@ -105,6 +105,7 @@ for panel in panels:
 print(sum(len(panel['leds']) for panel in panels))
 
 clock = pygame.time.Clock()
+max_animation = 0
 
 
 def anim_map(an):
@@ -148,7 +149,10 @@ while 1:
                 vx,
                 vy,
             ])
-            panel['next'] = random.gammavariate(3, 10)
+            panel['next'] = random.gammavariate(3, 5)
+            if len(panel['animation']) > max_animation:
+                max_animation = len(panel['animation'])
+                print(max_animation)
 
         for led in panel['leds']:
             pygame.draw.circle(screen, gray, led, led_radius)
