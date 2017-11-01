@@ -14,6 +14,11 @@ gray = 0, 30, 75
 white = 0xff, 0xff, 0xff
 blue = 0, 20, 50
 
+background = black
+led_off = gray
+led_on = white
+sky = blue
+
 screen = pygame.display.set_mode(size)
 
 cloud = pygame.image.load("cloud.png")
@@ -126,8 +131,8 @@ while 1:
             else:
                 mode = 'snow'
 
-    screen.fill(black)
-    pygame.draw.rect(screen, blue, pygame.Rect(0, 0, 1500, 900))
+    screen.fill(background)
+    pygame.draw.rect(screen, sky, pygame.Rect(0, 0, 1500, 900))
 
     for panel in panels:
         panel['animation'] = filter(
@@ -155,7 +160,7 @@ while 1:
                 print(max_animation)
 
         for led in panel['leds']:
-            pygame.draw.circle(screen, gray, led, led_radius)
+            pygame.draw.circle(screen, led_off, led, led_radius)
 
         if mode == 'snow':
             cloudrect = cloud.get_rect()
@@ -164,12 +169,12 @@ while 1:
 
             for an in panel['animation']:
                 index = int(round(an[0]) + panel['ledsw'] * int(an[1]))
-                pygame.draw.circle(screen, white, panel['leds'][index], led_radius)
+                pygame.draw.circle(screen, led_on, panel['leds'][index], led_radius)
         else:
             for panel in panels:
                 for star in panel['stars']:
                     index = star[0] + panel['ledsw'] * star[1]
-                    pygame.draw.circle(screen, white, panel['leds'][index], led_radius)
+                    pygame.draw.circle(screen, led_on, panel['leds'][index], led_radius)
 
     pygame.display.flip()
 
