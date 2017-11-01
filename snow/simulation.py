@@ -31,71 +31,62 @@ led_panel = (240, 200)
 led_spacing = (20, 25)
 
 panels = [{
-    'x': 100,
+    'x': 100,  # to so koordinate prve ledice
     'y': 450,
     'height': 2,
     'stars': [
-        (3, 1),
-        (1, 4),
-        (4, 6),
-        (2, 10),
-        (7, 10),
+        (0, 0),
+        (6, 1),
+        (0, 2),
+        (6, 3),
+        (8, 6),
+        (10, 9),
+        (9, 12),
+        (5, 10),
+        (5, 15),
     ],
 }, {
     'x': 550,
-    'y': 200,
+    'y': 175,
     'height': 2,
     'stars': [
-        (7, 0),
-        (5, 1),
-        (4, 3),
-        (3, 6),
-        (0, 7),
-        (4, 10),
-        (1, 11),
+        (7, 6),
+        (7, 8),
+        (2, 6),
+        (3, 8),
+        (11, 9),
     ],
 }, {
     'x': 450,
-    'y': 680,
+    'y': 720,
     'height': 1,
     'stars': [
-        (0, 0),
-        (7, 3),
-        (3, 5),
-        (4, 2),
-        (0, 4),
+        (1, 2),
     ],
 }, {
     'x': 1200,
-    'y': 250,
+    'y': 270,
     'height': 3,
     'stars': [
-        (1, 0),
-        (5, 0),
-        (6, 6),
-        (3, 7),
-        (1, 11),
-        (0, 15),
-        (3, 20),
+        (4, 17),
+        (8, 16),
+        (9, 13),
+        (11, 9),
     ],
 }, {
     'x': 880,
     'y': 540,
     'height': 2,
     'stars': [
-        (4, 0),
-        (5, 2),
-        (1, 1),
-        (6, 3),
-        (7, 7),
-        (1, 4),
-        (4, 9),
-        (1, 8),
-        (3, 6),
-        (7, 10),
-        (1, 11),
+        (0, 0),
     ],
 }]
+
+additional_stars = [
+    (383, 833),
+    (838, 464),
+    (1468, 581),
+]
 
 
 for panel in panels:
@@ -175,6 +166,8 @@ while 1:
                 for star in panel['stars']:
                     index = star[0] + panel['ledsw'] * star[1]
                     pygame.draw.circle(screen, led_on, panel['leds'][index], led_radius)
+            for star in additional_stars:
+                pygame.draw.circle(screen, led_on, star, led_radius)
 
     pygame.display.flip()
 
