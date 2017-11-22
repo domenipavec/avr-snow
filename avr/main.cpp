@@ -89,6 +89,14 @@ static inline void spi_send() {
 	SPDR = data[12 * (spi_state >> 1) + 2 * multiplex_state + (spi_state & 0x1)];
 }
 
+static inline bool delay_eight_ms(uint16_t ms) {
+	bool done = TCNT1 >= ms;
+	if (done) {
+		TCNT1 = 0;
+	}
+	return done;
+}
+
 static inline bool delay_ms(uint16_t ms) {
 	bool done = (TCNT1 >> 3) >= ms;
 	if (done) {
@@ -123,10 +131,14 @@ static inline void clear(uint8_t x, uint8_t y) {
 }
 
 // subroutines
-static inline void process_spi() {
+static inline void process_spi(const uint8_t pwm) {
 	if (BITSET(SPSR, SPIF)) {
-		spi_state++;
-		if (spi_state >= 2*PANELS) {
+		if (spi_state < 2*PANELS - 1) {
+			spi_state++;
+			spi_send();
+		} else if (TCNT0 > 128) {
+			TCNT0 = 0;
+
 			// disable output
 			SETBIT(PORTA, PA0);
 
@@ -144,14 +156,38 @@ static inline void process_spi() {
 
 			// enable output
 			CLEARBIT(PORTA, PA0);
+			spi_send();
 		}
-		spi_send();
+	}
+	if (TCNT0 >= pwm) {
+		SETBIT(PORTA, PA0);
 	}
 }
 
 static inline void process_snowflakes() {
 	for (uint8_t i = 0; i < SNOWFLAKES; i++) {
 		snow_flakes[i].update();
+	}
+}
+
+static inline void add_snowflake(uint8_t &next) {
+	next--;
+	if (next <= 0) {
+		int8_t vy = 18 + (random8_normal()>>4);
+		if (vy < 2) {
+			vy = 2;
+		}
+		int16_t vx = random8_normal();
+		vx *= vy;
+		vx >>= 7;
+		for (uint8_t i = 0; i < SNOWFLAKES; i++) {
+			if (snow_flakes[i].is_dead()) {
+				snow_flakes[i].reset(random8_uniform(WIDTH), vx, vy);
+				break;
+			}
+		}
+
+		next = pgm_read_byte(&d_gamma[random8()]);
 	}
 }
 
@@ -239,6 +275,10 @@ int main() {
 	// double speed (fclk/2)
 	SETBIT(SPSR, SPI2X);
 
+	// init timer 0 for latch timing and oe pwm
+	TCNT0 = 0;
+	TCCR0B = BIT(CS01);
+
 	// init timer 1 for delay_ms function
 	TCNT1 = 0;
 	// clk/1024
@@ -262,74 +302,87 @@ int main() {
 	const uint8_t S_STARS_END = 8;
 
 	uint8_t state = S_TEST_INIT;
-	uint8_t next;
+	uint8_t next = 1;
+	uint8_t i = 0;
+	uint8_t pwm = 128;
 
-	uint16_t change_count;
+	uint16_t change_count = 0;
 
 	for (;;) {
 		switch (state) {
 			case S_TEST_INIT:
-				for (uint8_t i = 0; i < sizeof(data); i++) {
+				for (i = 0; i < sizeof(data); i++) {
 					data[i] = 0xff;
 				}
 				TCNT1 = 0;
+				pwm = 0;
+				i = 0;
 				state = S_TEST;
 				break;
 			case S_TEST:
-				if (delay_ms(2000)) {
-					state = S_SNOW_INIT;
+				if (i == 0) {
+					if (delay_ms(5)) {
+						pwm++;
+						if (pwm >= 128) {
+							i = 1;
+						}
+					}
+				} else {
+					if (delay_ms(5)) {
+						pwm--;
+						if (pwm == 0) {
+							state = S_SNOW_INIT;
+						}
+					}
 				}
 				break;
 			case S_SNOW_INIT:
-				for (uint8_t i = 0; i < sizeof(data); i++) {
+				for (i = 0; i < sizeof(data); i++) {
 					data[i] = 0;
 				}
-				for (uint8_t i = 0; i < SNOWFLAKES; i++) {
+				for (i = 0; i < SNOWFLAKES; i++) {
 					snow_flakes[i].kill();
 				}
 				next = 1;
 				TCNT1 = 0;
 				change_count = 0;
+				i = 0;
+				pwm = 128;
 				state = S_SNOW;
 				break;
 			case S_SNOW:
-				if (delay_ms(16)) {
-					process_snowflakes();
+				// delay enough to process each snowflake in one frame
+				if (delay_eight_ms(8*16/SNOWFLAKES)) {
+					snow_flakes[i].update();
 
-					next--;
-					if (next <= 0) {
-						int8_t vy = 18 + (random8_normal()>>4);
-						if (vy < 2) {
-							vy = 2;
+					i++;
+					if (i >= SNOWFLAKES) { // this is once per frame
+						i = 0;
+
+						add_snowflake(next);
+
+						change_count++;
+						if (change_count >= 1000) {
+							// transition from snow to stars
+							change_count = 0;
+							state = S_SNOW_END;
 						}
-						int16_t vx = random8_normal();
-						vx *= vy;
-						vx >>= 7;
-						for (uint8_t i = 0; i < SNOWFLAKES; i++) {
-							if (snow_flakes[i].is_dead()) {
-								snow_flakes[i].reset(random8_uniform(WIDTH), vx, vy);
-								break;
-							}
-						}
-
-						next = pgm_read_byte(&d_gamma[random8()]);
-					}
-
-					change_count++;
-					if (change_count >= 312) {
-						// transition from snow to stars
-						change_count = 0;
-						state = S_SNOW_END;
 					}
 				}
 				break;
 			case S_SNOW_END:
-				if (delay_ms(16)) {
-					process_snowflakes();
+				// delay enough to process each snowflake in one frame
+				if (delay_eight_ms(8*16/SNOWFLAKES)) {
+					snow_flakes[i].update();
 
-					change_count++;
-					if (change_count >= 300) {
-						state = S_STARS_INIT;
+					i++;
+					if (i >= SNOWFLAKES) { // this is once per frame
+						i = 0;
+
+						change_count++;
+						if (change_count >= 300) {
+							state = S_STARS_INIT;
+						}
 					}
 				}
 				break;
@@ -344,11 +397,18 @@ int main() {
 					);
 				}
 				TCNT1 = 0;
+				pwm = 0;
 				state = S_STARS_START;
 				break;
 			case S_STARS_START:
-				TCNT1 = 0;
-				state = S_STARS;
+				if (pwm < 128) {
+					if (delay_ms(10)) {
+						pwm++;
+					}
+				} else {
+					TCNT1 = 0;
+					state = S_STARS;
+				}
 				break;
 			case S_STARS:
 				if (delay_ms(8000)) {
@@ -356,14 +416,28 @@ int main() {
 				}
 				break;
 			case S_STARS_END:
-				state = S_SNOW_INIT;
+				if (pwm > 0) {
+					if (delay_ms(10)) {
+						pwm--;
+						if (pwm == 0) {
+							for (uint8_t i = 0; i < sizeof(data); i++) {
+								data[i] = 0;
+							}
+						}
+					}
+				} else {
+					if (delay_ms(500)) {
+						TCNT1 = 0;
+						state = S_SNOW_INIT;
+					}
+				}
 				break;
 			default:
 				state = S_SNOW_INIT;
 				break;
 		}
 
-		process_spi();
+		process_spi(pwm);
 	}
 }
 
