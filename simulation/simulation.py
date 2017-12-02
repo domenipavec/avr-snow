@@ -36,14 +36,14 @@ panels = [{
     'height': 2,
     'stars': [
         (0, 0),
-        (6, 1),
-        (0, 2),
         (6, 3),
         (8, 6),
         (10, 9),
         (9, 12),
-        (5, 10),
-        (5, 15),
+
+        (0, 15),
+        (3, 14),
+        (2, 8),
     ],
 }, {
     'x': 550,
@@ -55,6 +55,12 @@ panels = [{
         (2, 6),
         (3, 8),
         (11, 9),
+
+        (3, 15),
+        (4, 13),
+        (2, 2),
+        (5, 0),
+        (9, 1),
     ],
 }, {
     'x': 450,
@@ -62,6 +68,9 @@ panels = [{
     'height': 1,
     'stars': [
         (1, 2),
+
+        (11, 1),
+        (8, 7),
     ],
 }, {
     'x': 1200,
@@ -72,6 +81,13 @@ panels = [{
         (8, 16),
         (9, 13),
         (11, 9),
+
+        (3, 0),
+        (1, 3),
+        (5, 3),
+        (3, 6),
+        (11, 20),
+        (6, 23),
     ],
 }, {
     'x': 880,
@@ -79,6 +95,20 @@ panels = [{
     'height': 2,
     'stars': [
         (0, 0),
+
+        # hp
+        (9, 2),
+        (8, 4),
+        (7, 6),
+        (6, 8),
+        (8, 7),
+        (10, 6),
+        (9, 8),
+        (8, 10),
+        (7, 12),
+
+        (3, 14),
+        (2, 8),
     ],
 }]
 
@@ -86,6 +116,64 @@ additional_stars = [
     (383, 833),
     (838, 464),
     (1468, 581),
+
+    # kefej
+    (1085, 30),
+    (1253, 90),
+    (979, 167),
+    (1128, 247),
+    (939, 381),
+
+    # drugo
+    (1161, 75),
+    (1131, 77),
+    (1121, 129),
+    (1111, 152),
+    (991, 219),
+    (1008, 264),
+    (968, 326),
+    (944, 45),
+    (821, 48),
+    (850, 266),
+    (1378, 42),
+    (1409, 91),
+    (1468, 42),
+    (450, 50),
+    (488, 94),
+    (419, 145),
+    (329, 146),
+    (318, 109),
+    (232, 106),
+    (138, 93),
+    (56, 83),
+    (96, 190),
+    (234, 191),
+    (252, 261),
+    (388, 261),
+    (470, 395),
+    (429, 543),
+    (44, 738),
+    (734, 732),
+    (811, 667),
+    (840, 817),
+    (786, 807),
+    (1169, 626),
+    (1142, 744),
+    (1166, 846),
+    (624, 645),
+    (64, 584),
+    (60, 322),
+    (266, 866),
+    (1469, 748),
+    (1455, 320),
+    (1481, 346),
+    (1102, 348),
+    (1117, 385),
+    (198, 36),
+    (142, 253),
+    (405, 453),
+    (506, 486),
+    (1036, 106),
 ]
 
 
@@ -110,6 +198,7 @@ def anim_map(an):
     return x, y, an[2], an[3]
 
 
+max_len = 0
 while 1:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -126,6 +215,9 @@ while 1:
     pygame.draw.rect(screen, sky, pygame.Rect(0, 0, 1500, 900))
 
     for panel in panels:
+        if len(panel['animation']) > max_len:
+            max_len = len(panel['animation'])
+            print(max_len)
         panel['animation'] = filter(
             lambda an: round(an[0]) >= 0 and round(an[0]) < panel['ledsw'] and int(an[1]) < panel['ledsh'],
             map(anim_map, panel['animation']))
@@ -153,10 +245,10 @@ while 1:
         for led in panel['leds']:
             pygame.draw.circle(screen, led_off, led, led_radius)
 
+        cloudrect = cloud.get_rect()
+        cloudrect = cloudrect.move([panel['x'] - 30, panel['y'] - 150])
+        screen.blit(cloud, cloudrect)
         if mode == 'snow':
-            cloudrect = cloud.get_rect()
-            cloudrect = cloudrect.move([panel['x'] - 30, panel['y'] - 150])
-            screen.blit(cloud, cloudrect)
 
             for an in panel['animation']:
                 index = int(round(an[0]) + panel['ledsw'] * int(an[1]))
