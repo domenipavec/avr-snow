@@ -27,7 +27,7 @@
 //#include <util/delay.h>
 
 #include <avr/io.h>
-// #include <avr/interrupt.h>
+#include <avr/interrupt.h>
 #include <avr/pgmspace.h>
 // #include <avr/eeprom.h>
 #include <util/delay.h>
@@ -43,9 +43,64 @@ static const uint8_t PANELS = 2;
 
 // array of stars - x than y
 static const uint8_t stars[] PROGMEM = {
+// plates from left to right (looking from front)
+
+// plate1
+	// 0, 0,
+	// 6, 3,
+	// 8, 6,
+	// 10, 9,
+	// 9, 12,
+    //
+	// 0, 15,
+	// 3, 14,
+	// 2, 8,
+
+// plate2
+	// 1, 2,
+    //
+	// 11, 1,
+	// 8, 7,
+
+// plate3
+	// 7, 6,
+	// 7, 8,
+	// 2, 6,
+	// 3, 8,
+	// 11, 9,
+    //
+	// 3, 15,
+	// 4, 13,
+	// 2, 2,
+	// 5, 0,
+	// 9, 1,
+
+// plate4
 	0, 0,
-	1, 2,
-	2, 4,
+
+	11, 1,
+	9, 3,
+	5, 4,
+	10, 6,
+	2, 8,
+	7, 9,
+	8, 12,
+	5, 14,
+	0, 15,
+	11, 15,
+
+// plate5
+	// 4, 17,
+	// 8, 16,
+	// 9, 13,
+	// 11, 9,
+    //
+	// 3, 0,
+	// 1, 3,
+	// 5, 3,
+	// 3, 6,
+	// 11, 20,
+	// 6, 23,
 };
 
 // class definitions
@@ -75,6 +130,18 @@ static const uint8_t WIDTH = 12;
 static const uint8_t HEIGHT = PANELS * 8;
 static const uint8_t SNOWFLAKES = 32;
 
+// STATES
+static const uint8_t S_TEST_INIT = 0;
+static const uint8_t S_TEST = 1;
+static const uint8_t S_TEST_ONE = 2;
+static const uint8_t S_SNOW_INIT = 3;
+static const uint8_t S_SNOW = 4;
+static const uint8_t S_SNOW_END = 5;
+static const uint8_t S_STARS_INIT = 6;
+static const uint8_t S_STARS_START = 7;
+static const uint8_t S_STARS = 8;
+static const uint8_t S_STARS_END = 9;
+
 // gamma variate a=3, b=5
 static const uint8_t d_gamma[] PROGMEM = {1, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7,7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 21, 21, 21, 21, 21, 21, 22, 22, 22, 22, 22, 22, 22, 23, 23, 23, 23, 23, 24, 24, 24, 24, 24, 25, 25, 25, 25, 26, 26, 26, 26, 27, 27, 27, 28, 28, 28, 29, 29, 29, 30, 30, 31, 31, 32, 32, 33, 33, 34, 35, 36, 37, 38, 40, 42, 45, 52};
 
@@ -83,6 +150,8 @@ static uint8_t data[PANELS*12];
 static SnowFlake snow_flakes[SNOWFLAKES];
 static uint8_t spi_state = 0;
 static uint8_t multiplex_state = 0;
+static volatile uint8_t state = S_TEST_INIT;
+static volatile uint8_t snow_speed = 0;
 
 // helper functions
 static inline void spi_send() {
@@ -188,6 +257,12 @@ static inline void add_snowflake(uint8_t &next) {
 		}
 
 		next = pgm_read_byte(&d_gamma[random8()]);
+		if ((snow_speed >> 6) == 0) {
+			next >>= 1;
+		} else {
+			next *= (snow_speed >> 6);
+		}
+		next += (snow_speed >> 2);
 	}
 }
 
@@ -253,6 +328,60 @@ void SnowFlake::undraw() {
 	clear(x >> DECIMALS, y >> DECIMALS);
 }
 
+// ISRs
+static const uint8_t UART_ADDRESS = 0x0d;
+ISR(USART0_RX_vect) {
+	static uint8_t ignore = 0;
+	static uint8_t uart_state = 0;
+	static uint8_t x;
+
+	uint8_t uart_data = UDR0;
+
+	if (ignore > 0) {
+		ignore--;
+		return;
+	}
+
+	if (uart_state == 0) {
+		if (UART_ADDRESS == (uart_data & 0x0f)) {
+			uart_state = 1;
+		} else if (0x0c == (uart_data & 0x0f)) {
+			if (state == S_SNOW) {
+				state = S_SNOW_END;
+			}
+		} else if (0x0b == (uart_data & 0x0f)) {
+			if (state == S_STARS) {
+				state = S_STARS_END;
+			}
+		} else {
+			ignore = uart_data >> 4;
+		}
+	} else if (uart_state == 1) {
+		if (uart_data == 0) {
+			uart_state = 2;
+		} else if (uart_data == 1) {
+			uart_state = 3;
+		} else {
+			uart_state = 0;
+		}
+	} else if (uart_state == 2) {
+		snow_speed = uart_data;
+		uart_state = 0;
+	} else if (uart_state == 3) {
+		x = uart_data;
+		uart_state = 4;
+	} else if (uart_state == 4) {
+		for (uint8_t i = 0; i < sizeof(data); i++) {
+			data[i] = 0;
+		}
+		set(x, uart_data);
+		state = S_TEST_ONE;
+		uart_state = 0;
+	} else {
+		uart_state = 0;
+	}
+}
+
 int main() {
 	// init
 
@@ -275,6 +404,14 @@ int main() {
 	// double speed (fclk/2)
 	SETBIT(SPSR, SPI2X);
 
+	// uart init
+	// enable receive and receive interrupt
+	UCSR0B = BIT(RXEN0) | BIT(RXCIE0);
+	// 8 bits
+	UCSR0C = BIT(UCSZ01) | BIT(UCSZ00);
+	// 19200 baud rate
+	UBRR0 = 25;
+
 	// init timer 0 for latch timing and oe pwm
 	TCNT0 = 0;
 	TCCR0B = BIT(CS01);
@@ -285,23 +422,11 @@ int main() {
 	TCCR1B = BIT(CS12) | BIT(CS10);
 
 	// enable interrupts
-	// sei();
+	sei();
 
 	// start spi auto sending
 	spi_send();
 
-	// STATES
-	const uint8_t S_TEST_INIT = 0;
-	const uint8_t S_TEST = 1;
-	const uint8_t S_SNOW_INIT = 2;
-	const uint8_t S_SNOW = 3;
-	const uint8_t S_SNOW_END = 4;
-	const uint8_t S_STARS_INIT = 5;
-	const uint8_t S_STARS_START = 6;
-	const uint8_t S_STARS = 7;
-	const uint8_t S_STARS_END = 8;
-
-	uint8_t state = S_TEST_INIT;
 	uint8_t next = 1;
 	uint8_t i = 0;
 	uint8_t pwm = 128;
@@ -314,6 +439,7 @@ int main() {
 				for (i = 0; i < sizeof(data); i++) {
 					data[i] = 0xff;
 				}
+			case S_TEST_ONE:
 				TCNT1 = 0;
 				pwm = 0;
 				i = 0;
@@ -360,13 +486,6 @@ int main() {
 						i = 0;
 
 						add_snowflake(next);
-
-						change_count++;
-						if (change_count >= 1000) {
-							// transition from snow to stars
-							change_count = 0;
-							state = S_SNOW_END;
-						}
 					}
 				}
 				break;
@@ -380,7 +499,7 @@ int main() {
 						i = 0;
 
 						change_count++;
-						if (change_count >= 300) {
+						if (change_count >= 673) {
 							state = S_STARS_INIT;
 						}
 					}
@@ -402,7 +521,7 @@ int main() {
 				break;
 			case S_STARS_START:
 				if (pwm < 128) {
-					if (delay_ms(10)) {
+					if (delay_ms(20)) {
 						pwm++;
 					}
 				} else {
@@ -411,13 +530,10 @@ int main() {
 				}
 				break;
 			case S_STARS:
-				if (delay_ms(8000)) {
-					state = S_STARS_END;
-				}
 				break;
 			case S_STARS_END:
 				if (pwm > 0) {
-					if (delay_ms(10)) {
+					if (delay_ms(20)) {
 						pwm--;
 						if (pwm == 0) {
 							for (uint8_t i = 0; i < sizeof(data); i++) {
